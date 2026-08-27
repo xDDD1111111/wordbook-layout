@@ -1,7 +1,7 @@
 {
   "name": "wordbook-layout",
-  "version": "1.0.0",
-  "description": "A responsive wordbook layout for Obsidian reading view.",
+  "version": "1.0.1",
+  "description": "A responsive wordbook layout with inline annotation bubbles for Obsidian.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -11,13 +11,13 @@
     "obsidian",
     "wordbook",
     "vocabulary",
-    "layout"
+    "layout",
+    "annotation"
   ],
   "author": "xddd1111111",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^16.18.126",
-    "builtin-modules": "^3.3.0",
     "esbuild": "^0.28.2",
     "obsidian": "^1.8.7",
     "typescript": "^5.4.5"

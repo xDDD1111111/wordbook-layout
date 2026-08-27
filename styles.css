@@ -30,7 +30,6 @@
 .wordbook-layout-section {
   min-width: 0;
   padding: 24px 24px 28px;
-  background: var(--background-secondary-alt);
   background: color-mix(in srgb, var(--background-primary) 92%, var(--background-secondary));
   border: 1px solid var(--background-modifier-border);
   border-radius: 14px;
@@ -128,4 +127,171 @@ body.is-mobile .wordbook-layout-section {
 body.is-mobile .wordbook-layout-section input[type="checkbox"] {
   min-width: 22px;
   min-height: 22px;
+}
+
+.wordbook-layout-container a.wordbook-annotation-link {
+  display: inline-block;
+  padding: 0;
+  color: var(--text-normal);
+  background-image: none;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--interactive-accent);
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 2px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wordbook-layout-container a.wordbook-annotation-link::before,
+.wordbook-layout-container a.wordbook-annotation-link::after {
+  display: none;
+  content: none;
+}
+
+.wordbook-layout-container a.wordbook-annotation-link:hover,
+.wordbook-layout-container a.wordbook-annotation-link:focus-visible,
+.wordbook-layout-container a.wordbook-annotation-link.is-wordbook-annotation-active {
+  color: var(--text-normal);
+  background-color: var(--text-highlight-bg);
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 65%, transparent);
+  outline-offset: 2px;
+  text-decoration-color: var(--interactive-accent-hover);
+}
+
+.wordbook-annotation-popover {
+  --wordbook-annotation-popover-bg: rgb(246 248 250 / 88%);
+  --wordbook-annotation-popover-border: rgb(255 255 255 / 92%);
+  position: fixed;
+  z-index: calc(var(--layer-popover, 1000) + 1);
+  width: max-content;
+  min-width: 140px;
+  max-width: min(440px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 24px));
+  overflow: visible;
+  isolation: isolate;
+  color: var(--text-normal);
+  background: var(--wordbook-annotation-popover-bg);
+  border: 1px solid var(--wordbook-annotation-popover-border);
+  border-radius: 16px;
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 18%),
+    0 3px 12px rgb(0 0 0 / 10%),
+    inset 0 1px 0 rgb(255 255 255 / 58%);
+  backdrop-filter: blur(36px) saturate(155%) contrast(108%);
+  -webkit-backdrop-filter: blur(36px) saturate(155%) contrast(108%);
+  opacity: 0;
+  transition: opacity 130ms ease;
+}
+
+.theme-dark .wordbook-annotation-popover {
+  --wordbook-annotation-popover-bg: rgb(34 36 41 / 88%);
+  --wordbook-annotation-popover-border: rgb(255 255 255 / 20%);
+}
+
+.wordbook-annotation-popover.is-visible {
+  opacity: 1;
+}
+
+.wordbook-annotation-popover::before {
+  content: "";
+  position: absolute;
+  top: var(--wordbook-annotation-arrow-y, 36px);
+  width: 14px;
+  height: 14px;
+  background: var(--wordbook-annotation-popover-bg);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.wordbook-annotation-popover.is-right::before {
+  left: -8px;
+  border-bottom: 1px solid var(--wordbook-annotation-popover-border);
+  border-left: 1px solid var(--wordbook-annotation-popover-border);
+}
+
+.wordbook-annotation-popover.is-left::before {
+  right: -8px;
+  border-top: 1px solid var(--wordbook-annotation-popover-border);
+  border-right: 1px solid var(--wordbook-annotation-popover-border);
+}
+
+.wordbook-annotation-popover-body {
+  display: grid;
+  gap: 8px;
+  max-width: inherit;
+  max-height: min(340px, calc(100vh - 48px));
+  padding: 17px 19px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: var(--font-text-size);
+  line-height: 1.65;
+  white-space: normal;
+  user-select: text;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wordbook-annotation-popover-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+}
+
+.wordbook-annotation-popover-label {
+  color: var(--text-accent);
+  font-size: 0.82em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wordbook-annotation-popover-value {
+  min-width: 0;
+}
+
+.wordbook-annotation-popover-row.is-meaning {
+  display: block;
+  margin-bottom: 4px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.wordbook-annotation-popover-row.is-meaning .wordbook-annotation-popover-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.78em;
+  letter-spacing: 0.04em;
+}
+
+.wordbook-annotation-popover-row.is-meaning .wordbook-annotation-popover-value {
+  display: block;
+  color: var(--text-normal);
+  font-size: 1.08em;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.wordbook-annotation-popover-line {
+  white-space: pre-wrap;
+}
+
+.wordbook-annotation-popover.is-mobile {
+  max-height: min(52vh, 420px);
+  border-radius: 16px;
+  box-shadow:
+    0 22px 52px rgb(0 0 0 / 24%),
+    0 4px 14px rgb(0 0 0 / 13%);
+}
+
+.wordbook-annotation-popover.is-mobile::before {
+  display: none;
+}
+
+.wordbook-annotation-popover.is-mobile .wordbook-annotation-popover-body {
+  max-height: min(46vh, 360px);
+  padding: 16px 18px;
+  font-size: max(var(--font-text-size), 16px);
 }

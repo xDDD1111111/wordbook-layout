@@ -3,6 +3,7 @@ import {
   MarkdownRenderer,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   TFile
 } from "obsidian";
@@ -10,6 +11,145 @@ import {
 const PROPERTY = "wordbook-layout";
 const LEGACY_PROPERTY = "单词书布局";
 const REFRESH_DELAY = 40;
+const ANNOTATION_SCHEME = "obsidian-annotation:";
+
+function decodeAnnotation(encoded: string): string {
+  const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function annotationFromHref(href: string | null): string | null {
+  if (!href?.startsWith(ANNOTATION_SCHEME)) return null;
+  try {
+    return decodeAnnotation(href.slice(ANNOTATION_SCHEME.length));
+  } catch (error: unknown) {
+    console.error("Wordbook Layout: could not decode annotation", error);
+    return null;
+  }
+}
+
+class AnnotationPopover {
+  element: HTMLDivElement | null = null;
+  anchor: HTMLAnchorElement | null = null;
+
+  open(anchor: HTMLAnchorElement, annotation: string): void {
+    this.close();
+    this.anchor = anchor;
+    anchor.addClass("is-wordbook-annotation-active");
+
+    const popover = document.body.createDiv({ cls: "wordbook-annotation-popover" });
+    popover.setAttribute("role", "dialog");
+    popover.setAttribute("aria-label", "批注");
+    this.element = popover;
+
+    const body = popover.createDiv({ cls: "wordbook-annotation-popover-body" });
+    this.renderAnnotation(body, annotation);
+    this.position();
+
+    window.requestAnimationFrame(() => {
+      if (this.element === popover) popover.addClass("is-visible");
+    });
+  }
+
+  private renderAnnotation(body: HTMLElement, annotation: string): void {
+    const lines = annotation.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    for (const line of lines) {
+      const separator = line.indexOf("｜");
+      if (separator <= 0) {
+        body.createDiv({ cls: "wordbook-annotation-popover-line", text: line });
+        continue;
+      }
+
+      const label = line.slice(0, separator).trim();
+      const value = line.slice(separator + 1).trim();
+      const row = body.createDiv({ cls: "wordbook-annotation-popover-row" });
+      if (label === "中文义") row.addClass("is-meaning");
+      row.createSpan({ cls: "wordbook-annotation-popover-label", text: label });
+      row.createSpan({ cls: "wordbook-annotation-popover-value", text: value });
+    }
+  }
+
+  position(): void {
+    if (!this.element || !this.anchor?.isConnected) {
+      this.close();
+      return;
+    }
+
+    const isMobile = Platform.isMobile || window.innerWidth <= 600;
+    this.element.toggleClass("is-mobile", isMobile);
+    if (isMobile) {
+      this.element.removeClass("is-left", "is-right");
+      this.element.style.left = "10px";
+      this.element.style.right = "10px";
+      this.element.style.top = "auto";
+      this.element.style.bottom = "calc(84px + env(safe-area-inset-bottom, 0px))";
+      this.element.style.width = "auto";
+      this.element.style.minWidth = "0";
+      this.element.style.maxWidth = "none";
+      return;
+    }
+
+    const viewportMargin = 12;
+    const anchorGap = 34;
+    const preferredMinimumWidth = 170;
+    const absoluteMinimumWidth = 140;
+    const maximumWidth = 440;
+    const anchorRect = this.anchor.getBoundingClientRect();
+    const rightSpace = window.innerWidth - anchorRect.right - anchorGap - viewportMargin;
+    const leftSpace = anchorRect.left - anchorGap - viewportMargin;
+    const useRight = rightSpace >= preferredMinimumWidth || rightSpace >= leftSpace;
+    const availableWidth = Math.max(absoluteMinimumWidth, useRight ? rightSpace : leftSpace);
+    const maxWidth = Math.min(maximumWidth, availableWidth);
+    const minWidth = Math.min(preferredMinimumWidth, maxWidth);
+
+    this.element.toggleClass("is-right", useRight);
+    this.element.toggleClass("is-left", !useRight);
+    this.element.style.removeProperty("right");
+    this.element.style.removeProperty("bottom");
+    this.element.style.width = "max-content";
+    this.element.style.minWidth = `${Math.floor(minWidth)}px`;
+    this.element.style.maxWidth = `${Math.floor(maxWidth)}px`;
+
+    const popoverRect = {
+      width: this.element.offsetWidth,
+      height: this.element.offsetHeight
+    };
+    const desiredTop = anchorRect.top + anchorRect.height / 2 - popoverRect.height / 2;
+    const maxTop = Math.max(viewportMargin, window.innerHeight - popoverRect.height - viewportMargin);
+    const top = Math.min(Math.max(desiredTop, viewportMargin), maxTop);
+    const desiredLeft = useRight
+      ? anchorRect.right + anchorGap
+      : anchorRect.left - anchorGap - popoverRect.width;
+    const maxLeft = Math.max(viewportMargin, window.innerWidth - popoverRect.width - viewportMargin);
+    const left = Math.min(Math.max(desiredLeft, viewportMargin), maxLeft);
+    const arrowY = Math.min(
+      Math.max(anchorRect.top + anchorRect.height / 2 - top, 22),
+      Math.max(22, popoverRect.height - 22)
+    );
+
+    this.element.style.left = `${Math.round(left)}px`;
+    this.element.style.top = `${Math.round(top)}px`;
+    this.element.style.setProperty("--wordbook-annotation-arrow-y", `${Math.round(arrowY)}px`);
+  }
+
+  contains(target: EventTarget | null): boolean {
+    return target instanceof Node && Boolean(this.element?.contains(target));
+  }
+
+  isOpenFor(anchor: HTMLAnchorElement): boolean {
+    return Boolean(this.element && this.anchor === anchor);
+  }
+
+  close(): void {
+    this.anchor?.removeClass("is-wordbook-annotation-active");
+    this.element?.remove();
+    this.element = null;
+    this.anchor = null;
+  }
+}
 
 interface WordbookRecord {
   component: Component;
@@ -25,11 +165,20 @@ export default class WordbookLayoutPlugin extends Plugin {
   private searchTimer: number | null = null;
   private searchHit: HTMLElement | null = null;
   private taskUpdateQueue: Promise<void> = Promise.resolve();
+  private annotationPopover = new AnnotationPopover();
+  private lastTouchLink: HTMLAnchorElement | null = null;
+  private lastTouchAt = 0;
+  private touchCandidate: {
+    link: HTMLAnchorElement;
+    pointerId: number;
+    x: number;
+    y: number;
+  } | null = null;
 
   async onload(): Promise<void> {
     this.addCommand({
       id: "toggle-current-note",
-      name: "Toggle wordbook layout for the current note",
+      name: "Toggle layout for the current note",
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
         if (!file || file.extension !== "md") return false;
@@ -63,6 +212,69 @@ export default class WordbookLayoutPlugin extends Plugin {
         this.queueSearchSync(40);
       }
     }, true);
+
+    this.registerDomEvent(document, "pointerdown", (event) => {
+      if (this.hasLegacyAnnotationPlugin()) return;
+      const link = this.getAnnotationLink(event.target);
+      if (link && event.pointerType !== "mouse") {
+        this.touchCandidate = {
+          link,
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY
+        };
+      } else {
+        this.touchCandidate = null;
+      }
+      if (!this.annotationPopover.contains(event.target) && !link) {
+        this.annotationPopover.close();
+      }
+    }, true);
+    this.registerDomEvent(document, "pointerup", (event) => {
+      if (this.hasLegacyAnnotationPlugin() || event.pointerType === "mouse") return;
+      const link = this.getAnnotationLink(event.target);
+      const candidate = this.touchCandidate;
+      this.touchCandidate = null;
+      if (
+        !link ||
+        !candidate ||
+        candidate.link !== link ||
+        candidate.pointerId !== event.pointerId ||
+        Math.hypot(event.clientX - candidate.x, event.clientY - candidate.y) > 12
+      ) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.lastTouchLink = link;
+      this.lastTouchAt = window.performance.now();
+      this.toggleAnnotationPopover(link);
+    }, true);
+    this.registerDomEvent(document, "pointercancel", () => {
+      this.touchCandidate = null;
+    }, true);
+    this.registerDomEvent(document, "click", (event) => {
+      if (this.hasLegacyAnnotationPlugin()) return;
+      const link = this.getAnnotationLink(event.target);
+      if (!link) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const wasHandledByTouch =
+        this.lastTouchLink === link && window.performance.now() - this.lastTouchAt < 800;
+      this.lastTouchLink = null;
+      if (!wasHandledByTouch) this.toggleAnnotationPopover(link);
+    }, true);
+    this.registerDomEvent(document, "keydown", (event) => {
+      if (this.hasLegacyAnnotationPlugin() || (event.key !== "Enter" && event.key !== " ")) return;
+      const link = this.getAnnotationLink(event.target);
+      if (!link) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleAnnotationPopover(link);
+    }, true);
+    this.registerDomEvent(document, "scroll", (event) => {
+      if (!this.annotationPopover.element || this.annotationPopover.contains(event.target)) return;
+      this.annotationPopover.close();
+    }, true);
+    this.registerDomEvent(window, "resize", () => this.annotationPopover.position());
 
     this.app.workspace.onLayoutReady(() => this.queueRefresh(0));
     this.register(() => this.cleanup());
@@ -137,6 +349,7 @@ export default class WordbookLayoutPlugin extends Plugin {
     try {
       await MarkdownRenderer.render(this.app, this.removeFrontmatter(source), container, file.path, component);
       if (this.layouts.get(view) !== record || !container.isConnected) return;
+      this.decorateAnnotationLinks(container);
       this.organizeSections(container);
       this.bindTasks(container, file, source, component);
     } catch (error) {
@@ -162,24 +375,59 @@ export default class WordbookLayoutPlugin extends Plugin {
     }
 
     const sectionLevel = Math.min(...levels);
-    const grid = document.createElement("div");
-    grid.className = "wordbook-layout-grid";
+    const grid = container.createDiv({ cls: "wordbook-layout-grid" });
     let section: HTMLElement | null = null;
     let preamble: HTMLElement | null = null;
 
     for (const node of nodes) {
       if (node.tagName === `H${sectionLevel}`) {
-        section = document.createElement("section");
-        section.className = "wordbook-layout-section";
-        grid.appendChild(section);
+        section = grid.createEl("section", { cls: "wordbook-layout-section" });
       } else if (!section && !preamble) {
-        preamble = document.createElement("div");
-        preamble.className = "wordbook-layout-preamble";
-        grid.appendChild(preamble);
+        preamble = grid.createDiv({ cls: "wordbook-layout-preamble" });
       }
       (section ?? preamble)?.appendChild(node);
     }
-    container.appendChild(grid);
+  }
+
+  private hasLegacyAnnotationPlugin(): boolean {
+    const pluginManager = (this.app as unknown as {
+      plugins?: { plugins?: Record<string, unknown> };
+    }).plugins;
+    return Boolean(pluginManager?.plugins?.["inline-annotation-popup"]);
+  }
+
+  private getAnnotationLink(target: EventTarget | null): HTMLAnchorElement | null {
+    if (!(target instanceof Element)) return null;
+    const link = target.closest<HTMLAnchorElement>(`a[href^="${ANNOTATION_SCHEME}"]`);
+    return link?.isConnected ? link : null;
+  }
+
+  private decorateAnnotationLinks(container: HTMLElement): void {
+    container.querySelectorAll<HTMLAnchorElement>(`a[href^="${ANNOTATION_SCHEME}"]`)
+      .forEach((link) => {
+        link.addClass("wordbook-annotation-link");
+        link.removeClass("external-link");
+        link.removeAttribute("target");
+        link.removeAttribute("rel");
+        link.removeAttribute("title");
+        link.removeAttribute("data-tooltip-position");
+        link.setAttribute("role", "button");
+        link.setAttribute("tabindex", "0");
+        link.setAttribute("aria-label", `查看 ${link.textContent ?? "此词"} 的批注`);
+      });
+  }
+
+  private toggleAnnotationPopover(link: HTMLAnchorElement): void {
+    if (this.annotationPopover.isOpenFor(link)) {
+      this.annotationPopover.close();
+      return;
+    }
+    const annotation = annotationFromHref(link.getAttribute("href"));
+    if (annotation === null) {
+      new Notice("这条批注无法读取，可能已损坏");
+      return;
+    }
+    this.annotationPopover.open(link, annotation);
   }
 
   private bindTasks(container: HTMLElement, file: TFile, source: string, component: Component): void {
@@ -251,8 +499,8 @@ export default class WordbookLayoutPlugin extends Plugin {
   }
 
   private syncSearchResult(): void {
-    const view = this.app.workspace.activeLeaf?.view;
-    if (!(view instanceof MarkdownView)) return;
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) return;
     const record = this.layouts.get(view);
     if (!record?.container.isConnected) {
       this.clearSearchHit();
@@ -315,6 +563,9 @@ export default class WordbookLayoutPlugin extends Plugin {
     if (record) {
       this.layouts.delete(view);
       if (record.container.contains(this.searchHit)) this.clearSearchHit();
+      if (this.annotationPopover.anchor && record.container.contains(this.annotationPopover.anchor)) {
+        this.annotationPopover.close();
+      }
       record.component.unload();
     }
     const preview = record?.preview ?? view.containerEl.querySelector<HTMLElement>(".markdown-preview-view");
@@ -326,6 +577,7 @@ export default class WordbookLayoutPlugin extends Plugin {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.searchTimer !== null) window.clearTimeout(this.searchTimer);
     this.clearSearchHit();
+    this.annotationPopover.close();
     for (const view of Array.from(this.layouts.keys())) this.cleanupView(view);
   }
 }

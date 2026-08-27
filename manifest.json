@@ -1,9 +1,9 @@
 {
   "id": "wordbook-layout",
   "name": "Wordbook Layout",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.5.0",
-  "description": "Arrange heading-based word lists as a responsive wordbook in reading view.",
+  "description": "Arrange word lists responsively and open inline annotation bubbles on desktop and mobile.",
   "author": "xddd1111111",
   "authorUrl": "https://github.com/xddd1111111",
   "isDesktopOnly": false

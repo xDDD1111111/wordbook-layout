@@ -7,13 +7,15 @@ Wordbook Layout arranges heading-based vocabulary lists into a clean, responsive
 - Groups note content by the highest-level headings in the note.
 - Uses a two-column layout on desktop and a single-column layout on mobile.
 - Keeps task checkboxes interactive and writes their state back to Markdown.
+- Opens `obsidian-annotation:` links as readable annotation bubbles instead of external links.
+- Supports mouse, keyboard, and touch interaction; phones show a safe-area-aware floating bubble.
 - Works with Obsidian's page search in the generated reading layout.
 - Uses only Obsidian APIs and supports desktop, Android, iPhone, and iPad.
 - Stores no separate database and makes no network requests.
 
 ## Usage
 
-Open a Markdown note and run **Toggle wordbook layout for the current note** from the command palette. The command adds this property:
+Open a Markdown note and run **Toggle layout for the current note** from the command palette. The command adds this property:
 
 ```yaml
 ---
@@ -45,7 +47,11 @@ wordbook-layout: true
 
 ## Mobile
 
-The layout automatically changes to one column below 760 pixels. The plugin does not use Node.js, Electron, or desktop-only filesystem APIs.
+The layout automatically changes to one column below 760 pixels. Tap an annotated word to open its annotation in a floating card above Obsidian's mobile toolbar; tap the word again or outside the card to close it. The plugin does not use Node.js, Electron, or desktop-only filesystem APIs.
+
+## Inline annotation format
+
+The plugin can display annotations stored directly in Markdown links using the `obsidian-annotation:` scheme. Existing notes created by Inline Annotation Popup remain compatible. Annotation content stays inside the Markdown note and no network request is made.
 
 ## License
 
